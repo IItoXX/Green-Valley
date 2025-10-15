@@ -1,0 +1,22 @@
+{
+  "name": "green-valley-pwa",
+  "version": "1.0.0",
+  "description": "A Progressive Web App for Green Valley project.",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "lite-server",
+    "build": "echo 'Build process not defined yet.'"
+  },
+  "keywords": [
+    "PWA",
+    "progressive",
+    "web",
+    "application"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "lite-server": "^2.6.1"
+  }
+}
