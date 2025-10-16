@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas.height = window.innerHeight;
     const ctx = canvas.getContext('2d');
 
-    // Récupération des assets du perso immobile
+    // Assets du perso
     const images = [];
     for (let i = 1; i <= 6; i++) {
         const img = new Image();
@@ -12,48 +12,74 @@ document.addEventListener('DOMContentLoaded', () => {
         images.push(img);
     }
 
-    // Position du perso (centre de l'écran)
-    let x = canvas.width / 2;
-    let y = canvas.height / 2;
+    // Taille de la map
+    const mapWidth = 3000;
+    const mapHeight = 3000;
 
-    // Taille cible (largeur max)
+    // Position du perso (au centre de la map)
+    let x = mapWidth / 2;
+    let y = mapHeight / 2;
+
+    // Taille du perso
     const targetWidth = 64;
 
-    // Animation : changement de frame toutes les 200ms
+    // Animation
     let currentFrame = 0;
     setInterval(() => {
         currentFrame = (currentFrame + 1) % images.length;
     }, 200);
 
-    // Variables pour le déplacement
+    // Déplacement
     let dx = 0, dy = 0;
     const speed = 3;
 
-    // Joystick logic
+    // Joystick
     const joystick = document.getElementById('joystick');
     const stick = document.getElementById('stick');
     let dragging = false;
-    const origin = { x: 60, y: 60 };
+    let origin = { x: 60, y: 60 };
+    joystick.style.display = 'none';
 
-    stick.addEventListener('touchstart', (e) => {
+    function showJoystick(xPos, yPos) {
+        joystick.style.display = 'block';
+        joystick.style.left = (xPos - 60) + 'px';
+        joystick.style.top = (yPos - 60) + 'px';
+        origin = { x: 60, y: 60 };
+        stick.style.left = '40px';
+        stick.style.top = '40px';
+    }
+    function hideJoystick() {
+        joystick.style.display = 'none';
+        dx = 0;
+        dy = 0;
+    }
+
+    canvas.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        showJoystick(touch.clientX, touch.clientY);
+        stick.style.left = (touch.clientX - parseInt(joystick.style.left) - 20) + 'px';
+        stick.style.top = (touch.clientY - parseInt(joystick.style.top) - 20) + 'px';
+        dragging = true;
+        e.preventDefault();
+    });
+    canvas.addEventListener('mousedown', (e) => {
+        showJoystick(e.clientX, e.clientY);
+        stick.style.left = (e.clientX - parseInt(joystick.style.left) - 20) + 'px';
+        stick.style.top = (e.clientY - parseInt(joystick.style.top) - 20) + 'px';
         dragging = true;
     });
 
-    document.addEventListener('touchend', () => {
-        dragging = false;
-        dx = 0;
-        dy = 0;
-        stick.style.left = '40px';
-        stick.style.top = '40px';
-    });
+    stick.addEventListener('touchstart', () => { dragging = true; });
+    stick.addEventListener('mousedown', () => { dragging = true; });
 
-    joystick.addEventListener('touchmove', (e) => {
+    document.addEventListener('touchend', () => { dragging = false; hideJoystick(); });
+    document.addEventListener('mouseup', () => { dragging = false; hideJoystick(); });
+
+    function handleMove(clientX, clientY) {
         if (!dragging) return;
-        const touch = e.touches[0];
         const rect = joystick.getBoundingClientRect();
-        let xStick = touch.clientX - rect.left;
-        let yStick = touch.clientY - rect.top;
-        // Limite le stick au cercle
+        let xStick = clientX - rect.left;
+        let yStick = clientY - rect.top;
         const dist = Math.sqrt((xStick - origin.x) ** 2 + (yStick - origin.y) ** 2);
         if (dist > 50) {
             const angle = Math.atan2(yStick - origin.y, xStick - origin.x);
@@ -64,26 +90,90 @@ document.addEventListener('DOMContentLoaded', () => {
         stick.style.top = (yStick - 20) + 'px';
         dx = (xStick - origin.x) / 50;
         dy = (yStick - origin.y) / 50;
+    }
+
+    document.addEventListener('touchmove', (e) => {
+        if (!dragging) return;
+        const touch = e.touches[0];
+        handleMove(touch.clientX, touch.clientY);
         e.preventDefault();
     }, { passive: false });
 
+    document.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        handleMove(e.clientX, e.clientY);
+    });
+
+    // --- AJOUT DE FORMES SUR LA MAP ---
+    const points = [];
+    for (let i = 0; i < 100; i++) {
+        points.push({
+            x: Math.random() * mapWidth,
+            y: Math.random() * mapHeight,
+            color: `hsl(${Math.random()*360},80%,60%)`
+        });
+    }
+
+
+    function isColliding(px, py, pr, ox, oy, or) {
+        // Collision entre deux cercles
+        const dist = Math.hypot(px - ox, py - oy);
+        return dist < pr + or;
+    }
+    
     // Boucle de dessin
     function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Calcul du déplacement proposé
+        let nextX = x + dx * speed;
+        let nextY = y + dy * speed;
 
-        // Déplacement du personnage
-        x += dx * speed;
-        y += dy * speed;
-
-        // Empêche le perso de sortir de l'écran
+        // Empêche le perso de sortir de la map
         const img = images[currentFrame];
         const ratio = img.height / img.width;
         const width = targetWidth;
         const height = targetWidth * ratio;
-        x = Math.max(width / 2, Math.min(canvas.width - width / 2, x));
-        y = Math.max(height / 2, Math.min(canvas.height - height / 2, y));
+        nextX = Math.max(width / 2, Math.min(mapWidth - width / 2, nextX));
+        nextY = Math.max(height / 2, Math.min(mapHeight - height / 2, nextY));
 
-        ctx.drawImage(img, x - width / 2, y - height / 2, width, height);
+        // Rayon du perso
+        const playerRadius = targetWidth / 2;
+
+        // Vérifie collision avec les points
+        let blocked = false;
+        points.forEach(pt => {
+            const pointRadius = 40;
+            if (isColliding(nextX, nextY, playerRadius, pt.x, pt.y, pointRadius)) {
+                blocked = true;
+            }
+        });
+
+        // Si pas de collision, on déplace le perso
+        if (!blocked) {
+            x = nextX;
+            y = nextY;
+        }
+
+        // Calcul caméra (centrée sur le perso)
+        let camX = x - canvas.width / 2;
+        let camY = y - canvas.height / 2;
+        camX = Math.max(0, Math.min(mapWidth - canvas.width, camX));
+        camY = Math.max(0, Math.min(mapHeight - canvas.height, camY));
+
+        // Dessine la map (fond noir)
+        ctx.fillStyle = "#222";
+        ctx.fillRect(-camX, -camY, mapWidth, mapHeight);
+
+        // Dessine les points sur la map
+        points.forEach(pt => {
+            ctx.beginPath();
+            ctx.arc(pt.x - camX, pt.y - camY, 40, 0, 2 * Math.PI);
+            ctx.fillStyle = pt.color;
+            ctx.fill();
+        });
+
+        // Dessine le perso au centre de l'écran
+        ctx.drawImage(img, x - width / 2 - camX, y - height / 2 - camY, width, height);
+
         requestAnimationFrame(draw);
     }
 
