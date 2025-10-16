@@ -121,6 +121,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return dist < pr + or;
     }
     
+    // Ajout d'une variable pour la direction
+    let facingLeft = false;
+
     // Boucle de dessin
     function draw() {
         // Calcul du déplacement proposé
@@ -135,23 +138,47 @@ document.addEventListener('DOMContentLoaded', () => {
         nextX = Math.max(width / 2, Math.min(mapWidth - width / 2, nextX));
         nextY = Math.max(height / 2, Math.min(mapHeight - height / 2, nextY));
 
-        // Rayon du perso
-        const playerRadius = targetWidth / 2;
+        // Rayon du perso (moitié de la largeur du sprite)
+        const playerRadius = targetWidth / 2; // 32 si targetWidth = 64
 
-        // Vérifie collision avec les points
+        // Rayon des points (doit être identique à celui du dessin)
+        const pointRadius = 40;
+
+        // Vérifie collision avec les points pour le déplacement complet
         let blocked = false;
         points.forEach(pt => {
-            const pointRadius = 40;
             if (isColliding(nextX, nextY, playerRadius, pt.x, pt.y, pointRadius)) {
                 blocked = true;
             }
         });
 
-        // Si pas de collision, on déplace le perso
         if (!blocked) {
             x = nextX;
             y = nextY;
+        } else {
+            // Test déplacement uniquement sur X
+            let blockedX = false;
+            points.forEach(pt => {
+                if (isColliding(nextX, y, playerRadius, pt.x, pt.y, pointRadius)) {
+                    blockedX = true;
+                }
+            });
+            // Test déplacement uniquement sur Y
+            let blockedY = false;
+            points.forEach(pt => {
+                if (isColliding(x, nextY, playerRadius, pt.x, pt.y, pointRadius)) {
+                    blockedY = true;
+                }
+            });
+
+            if (!blockedX) x = nextX;
+            if (!blockedY) y = nextY;
+            // Si les deux axes sont bloqués, le perso ne bouge pas
         }
+
+        // Détermine la direction du personnage
+        if (dx < -0.1) facingLeft = true;
+        else if (dx > 0.1) facingLeft = false;
 
         // Calcul caméra (centrée sur le perso)
         let camX = x - canvas.width / 2;
@@ -171,8 +198,17 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fill();
         });
 
-        // Dessine le perso au centre de l'écran
-        ctx.drawImage(img, x - width / 2 - camX, y - height / 2 - camY, width, height);
+        // Dessine le perso au centre de l'écran avec rotation si à gauche
+        ctx.save();
+        if (facingLeft) {
+            ctx.translate(x - camX + width / 2, y - camY);
+            ctx.scale(-1, 1);
+            ctx.drawImage(img, -width / 2, -height / 2, width, height);
+        } else {
+            ctx.translate(x - camX, y - camY);
+            ctx.drawImage(img, -width / 2, -height / 2, width, height);
+        }
+        ctx.restore();
 
         requestAnimationFrame(draw);
     }
